@@ -1,7 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import './App.css';
+import { getAllStamps, type StampRecord } from './db';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+type StampPreview = {
+  blob: Blob;
+  url: string;
+  updatedAt: number;
+};
 
 function pad2(value: number) {
   return String(value).padStart(2, '0');
@@ -17,11 +24,52 @@ function monthLabel(year: number, month: number) {
   return `${year} ${monthText}`;
 }
 
+function buildStampMap(records: StampRecord[]) {
+  const map: Record<string, StampPreview> = {};
+  records.forEach((record) => {
+    map[record.dateKey] = {
+      blob: record.blob,
+      url: URL.createObjectURL(record.blob),
+      updatedAt: record.updatedAt,
+    };
+  });
+  return map;
+}
+
 export default function App() {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
+  const [stampsByDate, setStampsByDate] = useState<Record<string, StampPreview>>({});
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getAllStamps()
+      .then((records) => {
+        if (!isMounted) return;
+        setStampsByDate((prev) => {
+          Object.values(prev).forEach((entry) => URL.revokeObjectURL(entry.url));
+          return buildStampMap(records);
+        });
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setStampsByDate((prev) => {
+          Object.values(prev).forEach((entry) => URL.revokeObjectURL(entry.url));
+          return {};
+        });
+      });
+
+    return () => {
+      isMounted = false;
+      setStampsByDate((prev) => {
+        Object.values(prev).forEach((entry) => URL.revokeObjectURL(entry.url));
+        return {};
+      });
+    };
+  }, []);
 
   const { totalCells, firstDay, daysInMonth } = useMemo(() => {
     const first = new Date(year, month, 1).getDay();
@@ -77,6 +125,7 @@ export default function App() {
 
           const dateKey = formatDateKey(year, month, dayNumber);
           const isSelected = selectedDateKey === dateKey;
+          const stamp = stampsByDate[dateKey];
 
           return (
             <button
@@ -87,7 +136,10 @@ export default function App() {
                 setSelectedDateKey(dateKey);
                 console.log(dateKey);
               }}>
-              {dayNumber}
+              <span className="calendar__day">{dayNumber}</span>
+              {stamp ? (
+                <img className="calendar__thumb" src={stamp.url} alt="" draggable={false} />
+              ) : null}
             </button>
           );
         })}
