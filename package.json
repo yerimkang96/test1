@@ -1,0 +1,10 @@
+{
+  "name": "vibe-calendar",
+  "version": "1.0.0",
+  "description": "Month calendar UI",
+  "type": "module",
+  "scripts": {
+    "build": "tsc"
+  },
+  "license": "MIT"
+}
