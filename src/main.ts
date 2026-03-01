@@ -1,8 +1,9 @@
-const app = document.getElementById('app');
+const appEl = document.getElementById('app');
 
-if (!app) {
+if (!appEl) {
   throw new Error('App container not found');
 }
+const app = appEl;
 
 type CalendarState = {
   year: number;
