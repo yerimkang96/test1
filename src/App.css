@@ -104,6 +104,10 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
+.calendar__file-input {
+  display: none;
+}
+
 .modal {
   position: fixed;
   inset: 0;

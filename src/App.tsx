@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import { getAllStamps, type StampRecord } from './db';
 
@@ -42,10 +42,10 @@ export default function App() {
   const [month, setMonth] = useState(today.getMonth());
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
   const [stampsByDate, setStampsByDate] = useState<Record<string, StampPreview>>({});
-  const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isCropperOpen, setIsCropperOpen] = useState(false);
   const [pendingDateKey, setPendingDateKey] = useState<string | null>(null);
   const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -102,11 +102,7 @@ export default function App() {
 
   const openPickerForDate = (dateKey: string) => {
     setPendingDateKey(dateKey);
-    setIsPickerOpen(true);
-  };
-
-  const closePicker = () => {
-    setIsPickerOpen(false);
+    fileInputRef.current?.click();
   };
 
   const closeCropper = () => {
@@ -119,13 +115,15 @@ export default function App() {
   };
 
   const handleFileSelected = (file: File | null) => {
-    if (!file) return;
+    if (!file) {
+      setPendingDateKey(null);
+      return;
+    }
     const nextUrl = URL.createObjectURL(file);
     if (pendingImageUrl) {
       URL.revokeObjectURL(pendingImageUrl);
     }
     setPendingImageUrl(nextUrl);
-    setIsPickerOpen(false);
     setIsCropperOpen(true);
   };
 
@@ -179,24 +177,19 @@ export default function App() {
         })}
       </div>
 
-      {isPickerOpen ? (
-        <div className="modal">
-          <div className="modal__panel">
-            <div className="modal__title">Select a photo</div>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(event) => {
-                const file = event.target.files?.[0] ?? null;
-                handleFileSelected(file);
-              }}
-            />
-            <button className="modal__button" onClick={closePicker}>
-              Close
-            </button>
-          </div>
-        </div>
-      ) : null}
+      <input
+        ref={fileInputRef}
+        className="calendar__file-input"
+        type="file"
+        accept="image/*"
+        onChange={(event) => {
+          const file = event.target.files?.[0] ?? null;
+          handleFileSelected(file);
+          if (event.target) {
+            event.target.value = '';
+          }
+        }}
+      />
 
       {isCropperOpen ? (
         <div className="modal">
