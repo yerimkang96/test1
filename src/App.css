@@ -104,6 +104,50 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 24, 20, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 20;
+}
+
+.modal__panel {
+  width: min(520px, 100%);
+  background: #fffaf4;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 18px 40px rgba(32, 27, 22, 0.2);
+  display: grid;
+  gap: 12px;
+}
+
+.modal__title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.modal__image {
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: #f0e8dd;
+}
+
+.modal__button {
+  border: none;
+  background: #2a2a2a;
+  color: #ffffff;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 @media (max-width: 640px) {
   .calendar {
     padding: 16px;
