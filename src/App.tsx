@@ -3,6 +3,7 @@ import './App.css';
 import { getAllStamps, type StampRecord } from './db';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const CROP_VIEWPORT_HEIGHT = 520;
 
 type StampPreview = {
   blob: Blob;
@@ -42,10 +43,21 @@ export default function App() {
   const [month, setMonth] = useState(today.getMonth());
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
   const [stampsByDate, setStampsByDate] = useState<Record<string, StampPreview>>({});
-  const [isCropperOpen, setIsCropperOpen] = useState(false);
   const [pendingDateKey, setPendingDateKey] = useState<string | null>(null);
   const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const stamperRef = useRef<HTMLImageElement | null>(null);
+  const [stamperCx, setStamperCx] = useState(0);
+  const [stamperCy, setStamperCy] = useState(0);
+  const [didInitStamper, setDidInitStamper] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragRef = useRef<{
+    startPointerX: number;
+    startPointerY: number;
+    startCx: number;
+    startCy: number;
+  } | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -74,6 +86,15 @@ export default function App() {
       });
     };
   }, []);
+
+  useEffect(() => {
+    if (!pendingImageUrl) return;
+    if (!viewportRef.current || didInitStamper) return;
+    const rect = viewportRef.current.getBoundingClientRect();
+    setStamperCx(rect.width / 2);
+    setStamperCy(rect.height / 2);
+    setDidInitStamper(true);
+  }, [pendingImageUrl, didInitStamper]);
 
   const { totalCells, firstDay, daysInMonth } = useMemo(() => {
     const first = new Date(year, month, 1).getDay();
@@ -106,12 +127,10 @@ export default function App() {
   };
 
   const closeCropper = () => {
-    setIsCropperOpen(false);
-    if (pendingImageUrl) {
-      URL.revokeObjectURL(pendingImageUrl);
-    }
     setPendingImageUrl(null);
     setPendingDateKey(null);
+    setDidInitStamper(false);
+    setIsDragging(false);
   };
 
   const handleFileSelected = (file: File | null) => {
@@ -119,12 +138,45 @@ export default function App() {
       setPendingDateKey(null);
       return;
     }
-    const nextUrl = URL.createObjectURL(file);
-    if (pendingImageUrl) {
-      URL.revokeObjectURL(pendingImageUrl);
-    }
-    setPendingImageUrl(nextUrl);
-    setIsCropperOpen(true);
+    console.log('file chosen', { name: file.name, size: file.size, type: file.type });
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        console.log('FileReader onload', { length: reader.result.length });
+        setPendingImageUrl(reader.result);
+        console.log('CropperModal open', pendingDateKey ?? '');
+      }
+    };
+    reader.onerror = () => {
+      console.error('FileReader error');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleStamperPointerDown = (event: React.PointerEvent<HTMLImageElement>) => {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsDragging(true);
+    dragRef.current = {
+      startPointerX: event.clientX,
+      startPointerY: event.clientY,
+      startCx: stamperCx,
+      startCy: stamperCy,
+    };
+  };
+
+  const handleStamperPointerMove = (event: React.PointerEvent<HTMLImageElement>) => {
+    if (!isDragging || !dragRef.current || !viewportRef.current || !stamperRef.current) return;
+    const dx = event.clientX - dragRef.current.startPointerX;
+    const dy = event.clientY - dragRef.current.startPointerY;
+    setStamperCx(dragRef.current.startCx + dx);
+    setStamperCy(dragRef.current.startCy + dy);
+  };
+
+  const handleStamperPointerUp = (event: React.PointerEvent<HTMLImageElement>) => {
+    setIsDragging(false);
+    dragRef.current = null;
+    event.currentTarget.releasePointerCapture(event.pointerId);
   };
 
   return (
@@ -191,16 +243,30 @@ export default function App() {
         }}
       />
 
-      {isCropperOpen ? (
+      {pendingImageUrl ? (
         <div className="modal">
-          <div className="modal__panel">
-            <div className="modal__title">Cropper (placeholder)</div>
-            {pendingImageUrl ? (
-              <img className="modal__image" src={pendingImageUrl} alt="Selected" />
-            ) : null}
-            <button className="modal__button" onClick={closeCropper}>
-              Close
-            </button>
+          <div className="modal__panel modal__panel--cropper">
+            <div className="cropper__viewport" ref={viewportRef} style={{ height: CROP_VIEWPORT_HEIGHT }}>
+              <img className="cropper__photo-img" src={pendingImageUrl} alt="Selected" />
+              <img
+                ref={stamperRef}
+                className="cropper__stamper"
+                src="/stampper2.png"
+                alt="Stamper"
+                style={{ left: `${stamperCx}px`, top: `${stamperCy}px`, transform: 'translate(-50%, -50%)' }}
+                onPointerDown={handleStamperPointerDown}
+                onPointerMove={handleStamperPointerMove}
+                onPointerUp={handleStamperPointerUp}
+                onPointerCancel={handleStamperPointerUp}
+                onDragStart={(event) => event.preventDefault()}
+                draggable={false}
+              />
+            </div>
+            <div className="modal__actions">
+              <button className="modal__button modal__button--ghost" onClick={closeCropper}>
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
