@@ -39,3 +39,8 @@ export async function deleteStamp(dateKey: string): Promise<void> {
   const db = await getDb();
   await db.delete(STORE_NAME, dateKey);
 }
+
+export async function clearAllStamps(): Promise<void> {
+  const db = await getDb();
+  await db.clear(STORE_NAME);
+}

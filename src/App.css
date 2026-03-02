@@ -132,6 +132,25 @@
   display: none;
 }
 
+.calendar__delete-all {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 999;
+  border: none;
+  background: #2a2a2a;
+  color: #fff;
+  padding: 12px 16px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+}
+
+.calendar__delete-all:hover {
+  background: #1f1f1f;
+}
+
 .modal {
   position: fixed;
   inset: 0;

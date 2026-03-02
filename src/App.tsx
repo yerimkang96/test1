@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
-import { getAllStamps, putStamp, type StampRecord } from './db';
+import { clearAllStamps, deleteStamp, getAllStamps, putStamp, type StampRecord } from './db';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const CROP_VIEWPORT_HEIGHT = 520;
@@ -159,6 +159,9 @@ export default function App() {
   const stamperRef = useRef<HTMLImageElement | null>(null);
   const photoRef = useRef<HTMLImageElement | null>(null);
   const dragRef = useRef<DragState | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressStartRef = useRef<{ x: number; y: number } | null>(null);
+  const didLongPressRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -414,6 +417,68 @@ export default function App() {
     }
   };
 
+  const handleDeleteAll = async () => {
+    const ok = window.confirm('모든 사진을 삭제할까요? 되돌릴 수 없습니다.');
+    if (!ok) return;
+    await clearAllStamps();
+    setStampsByDate((prev) => {
+      Object.values(prev).forEach((entry) => URL.revokeObjectURL(entry.url));
+      return {};
+    });
+    setBrokenStampKeys({});
+  };
+
+  const cancelLongPressTimer = () => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const startLongPress = (event: React.PointerEvent<HTMLButtonElement>, dateKey: string, hasStamp: boolean) => {
+    didLongPressRef.current = false;
+    longPressStartRef.current = { x: event.clientX, y: event.clientY };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    cancelLongPressTimer();
+    longPressTimerRef.current = window.setTimeout(async () => {
+      didLongPressRef.current = true;
+      if (!hasStamp) return;
+      const ok = window.confirm('이 날짜의 사진을 삭제할까요?');
+      if (!ok) return;
+      await deleteStamp(dateKey);
+      setStampsByDate((prev) => {
+        const existing = prev[dateKey];
+        if (existing) {
+          URL.revokeObjectURL(existing.url);
+        }
+        const next = { ...prev };
+        delete next[dateKey];
+        return next;
+      });
+      setBrokenStampKeys((prev) => {
+        if (!prev[dateKey]) return prev;
+        const next = { ...prev };
+        delete next[dateKey];
+        return next;
+      });
+    }, 450);
+  };
+
+  const handleLongPressMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!longPressStartRef.current) return;
+    const dx = event.clientX - longPressStartRef.current.x;
+    const dy = event.clientY - longPressStartRef.current.y;
+    if (Math.hypot(dx, dy) > 8) {
+      cancelLongPressTimer();
+    }
+  };
+
+  const endLongPress = (event: React.PointerEvent<HTMLButtonElement>) => {
+    cancelLongPressTimer();
+    longPressStartRef.current = null;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
   return (
     <div className="calendar">
       <header className="calendar__header">
@@ -462,7 +527,15 @@ export default function App() {
               key={dateKey}
               type="button"
               className={`calendar__cell${isSelected ? ' calendar__cell--selected' : ''}`}
+              onPointerDown={(event) => startLongPress(event, dateKey, canRenderStamp)}
+              onPointerMove={handleLongPressMove}
+              onPointerUp={endLongPress}
+              onPointerCancel={endLongPress}
               onClick={() => {
+                if (didLongPressRef.current) {
+                  didLongPressRef.current = false;
+                  return;
+                }
                 setSelectedDateKey(dateKey);
                 console.log(dateKey);
                 openPickerForDate(dateKey);
@@ -539,6 +612,10 @@ export default function App() {
           </div>
         </div>
       ) : null}
+
+      <button className="calendar__delete-all" type="button" onClick={handleDeleteAll}>
+        전체 삭제
+      </button>
     </div>
   );
 }
